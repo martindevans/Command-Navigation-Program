@@ -1,0 +1,90 @@
+set c, 0x8000
+  
+:start
+    jsr readkey
+    set [stringpointer], a
+    set push, stringpointer
+	jsr write
+          
+    set pc, start
+:end
+	set PC, end
+      
+:stringpointer
+	dat 0, 0
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; BEGIN TELETYPE ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;Read key into a
+;Clobbers a and i
+:readkey
+	set i,[keypointer]
+	add i,0x9000
+	set a,[i]
+	ife a,0
+		set pc, endreadkey
+	
+	set [i],0
+	add [keypointer], 1
+	and [keypointer], 0xf
+:endreadkey
+    set pc, pop
+
+:keypointer
+dat 0
+      
+;Write the null terminated string pointed at by the 2nd value on the stack
+;Clobbers a, b and c
+:write
+	set a, pop		;Pop sub return address
+	set b, pop		;Pop pointer to start of string
+        set c, [screenpointer]
+        
+	set push, a		;push sub return address
+
+:nextchar
+        mod c, 384              ;Wrap around when we run out of display
+	set a, [b]		;Read character
+
+	ife a, 0		;Null terminate
+	    set PC, nullterminate
+        ife a, 8                ;backspace
+            set PC, backspace
+        ife a, 10               ;Line Feed
+            set PC, linefeed
+        ife a, 13               ;Carriage return
+            set PC, carriagereturn
+
+	set [c + 0x8000], a	;write character
+        add c, 1		;Next screen pos
+
+:endspecialcharacter      
+	add b, 1		;Next character pos
+	set PC, nextchar
+
+:nullterminate
+        set [screenpointer], c
+        set PC, pop
+
+:carriagereturn
+        div c, 32               ;How many rows down are we?
+        mul c, 32               ;Move to start of the correct row
+        set PC, endspecialcharacter
+
+:linefeed
+        add c, 32
+        set PC, endspecialcharacter
+
+:backspace
+        sub c, 1
+        set [c + 0x8000], 0
+        set PC, endspecialcharacter
+
+:screenpointer
+    dat 0
+  
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; END TELETYPE ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
